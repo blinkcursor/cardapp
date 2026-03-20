@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Flashcards</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <style>
+    :root {
+      --card-radius: 14px;
+    }
+
+    body {
+      padding-bottom: 3rem;
+    }
+
+    /* ── Views ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Project list ── */
+    .project-list {
+      list-style: none;
+      padding: 0;
+      margin-bottom: 1.5rem;
+    }
+
+    .project-list li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--pico-card-border-color, #d1d5db);
+      border-radius: 10px;
+      margin-bottom: 0.5rem;
+      background: var(--pico-card-background-color, #fff);
+    }
+
+    .project-info {
+      flex: 1;
+      min-width: 0;
+      cursor: pointer;
+    }
+
+    .project-info strong {
+      display: block;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .project-meta {
+      font-size: 0.8rem;
+      color: var(--pico-muted-color);
+    }
+
+    .icon-btn {
+      background: none;
+      border: none;
+      padding: 0.3rem 0.5rem;
+      font-size: 1.1rem;
+      cursor: pointer;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    /* ── Mode selection ── */
+    .mode-section {
+      border: 1px solid var(--pico-card-border-color, #d1d5db);
+      border-radius: var(--card-radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .mode-section h3 {
+      margin: 0 0 0.25rem;
+    }
+
+    .mode-section > p {
+      margin: 0 0 1rem;
+      color: var(--pico-muted-color);
+      font-size: 0.9rem;
+    }
+
+    .mode-section label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .toggle-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 0.85rem;
+    }
+
+    .toggle-group button {
+      margin: 0;
+    }
+
+    /* ── Card view header ── */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .card-progress {
+      font-size: 0.85rem;
+      color: var(--pico-muted-color);
+    }
+
+    .card-badge {
+      font-size: 0.75rem;
+      color: var(--pico-muted-color);
+    }
+
+    /* ── Learning card ── */
+    .learning-card {
+      border: 1px solid var(--pico-card-border-color, #d1d5db);
+      border-radius: var(--card-radius);
+      overflow: hidden;
+      height: 60vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-half {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 1.5rem;
+    }
+
+    .card-half.jp-half {
+      border-top: 2px solid var(--pico-card-border-color, #d1d5db);
+      background: var(--pico-card-sectioning-background-color, #f8f9fa);
+    }
+
+    /* ── Review card (flip) ── */
+    .review-scene {
+      width: 100%;
+      height: 60vh;
+      perspective: 1200px;
+    }
+
+    .review-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .review-inner.flipped {
+      transform: rotateY(180deg);
+    }
+
+    .review-face {
+      position: absolute;
+      inset: 0;
+      backface-visibility: hidden;
+      -webkit-backface-visibility: hidden;
+      border: 1px solid var(--pico-card-border-color, #d1d5db);
+      border-radius: var(--card-radius);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 2rem 1.5rem;
+      background: var(--pico-card-background-color, #fff);
+    }
+
+    .review-face.back-face {
+      transform: rotateY(180deg);
+      background: var(--pico-card-sectioning-background-color, #f8f9fa);
+    }
+
+    /* ── Card content — selectable for native share ── */
+    .text-en,
+    .text-jp,
+    .text-romaji {
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
+    }
+
+    .text-en {
+      font-size: 1.6rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .text-jp {
+      font-size: 2rem;
+      line-height: 1.4;
+      margin-bottom: 0.4rem;
+    }
+
+    .text-romaji {
+      font-size: 0.95rem;
+      color: var(--pico-muted-color);
+    }
+
+    /* ── Nav buttons ── */
+    .card-nav {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+
+    .card-hint {
+      text-align: center;
+      font-size: 0.8rem;
+      color: var(--pico-muted-color);
+      margin-top: 0.5rem;
+      min-height: 1.2em;
+    }
+
+    /* ── Import drop zone ── */
+    .drop-zone {
+      border: 2px dashed var(--pico-muted-border-color, #adb5bd);
+      border-radius: var(--card-radius);
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 1.5rem;
+    }
+
+    .drop-zone:hover,
+    .drop-zone.drag-over {
+      border-color: var(--pico-primary);
+      background: var(--pico-primary-background, #f0f4ff);
+    }
+
+    .drop-zone .drop-icon {
+      font-size: 2.5rem;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .drop-zone p {
+      margin: 0.25rem 0 0;
+      color: var(--pico-muted-color);
+    }
+  </style>
+</head>
+<body>
+<main class="container">
+
+  <!-- ══════════════════════════════════════════
+       View: Home
+  ══════════════════════════════════════════ -->
+  <div id="view-home" class="view active">
+    <hgroup>
+      <h1>Flashcards</h1>
+      <p>Select a card set to study</p>
+    </hgroup>
+
+    <ul class="project-list" id="project-list"></ul>
+    <p id="no-projects-msg" hidden>No card sets yet — import one to get started.</p>
+
+    <button onclick="showView('view-import')">+ Import card set</button>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       View: Import
+  ══════════════════════════════════════════ -->
+  <div id="view-import" class="view">
+    <nav><a href="#" onclick="showView('view-home'); return false">← Back</a></nav>
+
+    <hgroup>
+      <h2>Import card set</h2>
+      <p>CSV file with columns: <strong>English, Japanese, Pronunciation</strong><br>
+         The first row should be a header row. Any extra columns are ignored.</p>
+    </hgroup>
+
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <span class="drop-icon">📂</span>
+      <p><strong>Tap to choose a CSV file</strong></p>
+      <p>or drag and drop here</p>
+    </div>
+    <input type="file" id="file-input" accept=".csv" hidden>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       View: Mode selection
+  ══════════════════════════════════════════ -->
+  <div id="view-mode" class="view">
+    <nav><a href="#" onclick="showView('view-home'); return false">← Back</a></nav>
+
+    <hgroup>
+      <h2 id="mode-title"></h2>
+      <p id="mode-subtitle"></p>
+    </hgroup>
+
+    <div class="mode-section">
+      <h3>📖 Learning mode</h3>
+      <p>Both sides of each card are visible as you swipe through</p>
+      <button onclick="startSession('learning')">Start learning</button>
+    </div>
+
+    <div class="mode-section">
+      <h3>🎯 Review mode</h3>
+      <p>See one side — tap to reveal the other</p>
+
+      <label>Show first</label>
+      <div class="toggle-group">
+        <button id="btn-en" onclick="setSide('english')">English</button>
+        <button id="btn-jp" class="outline" onclick="setSide('japanese')">Japanese</button>
+      </div>
+
+      <label>Order</label>
+      <div class="toggle-group">
+        <button id="btn-ordered" onclick="setOrder('ordered')">In order</button>
+        <button id="btn-random" class="outline" onclick="setOrder('random')">Random</button>
+      </div>
+
+      <button onclick="startSession('review')" class="contrast">Start review →</button>
+    </div>
+  </div>
+
+
+  <!-- ══════════════════════════════════════════
+       View: Cards
+  ══════════════════════════════════════════ -->
+  <div id="view-cards" class="view">
+    <nav><a href="#" onclick="showView('view-mode'); return false">← Back</a></nav>
+
+    <div class="card-header">
+      <span class="card-progress" id="card-progress">1 / 1</span>
+      <span class="card-badge" id="card-badge"></span>
+    </div>
+
+    <!-- Learning card -->
+    <div id="learning-wrap" hidden>
+      <div class="learning-card" id="learning-card">
+        <div class="card-half en-half">
+          <div class="text-en" id="lrn-en"></div>
+        </div>
+        <div class="card-half jp-half">
+          <div class="text-jp" id="lrn-jp"></div>
+          <div class="text-romaji" id="lrn-romaji"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Review card -->
+    <div id="review-wrap" hidden>
+      <div class="review-scene" id="review-scene">
+        <div class="review-inner" id="review-inner">
+          <div class="review-face" id="review-front"></div>
+          <div class="review-face back-face" id="review-back"></div>
+        </div>
+      </div>
+      <p class="card-hint" id="card-hint">Tap to reveal</p>
+    </div>
+
+    <div class="card-nav">
+      <button class="outline secondary" onclick="navigate(-1)">← Prev</button>
+      <button class="outline secondary" onclick="navigate(1)">Next →</button>
+    </div>
+  </div>
+
+</main>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────────
+const state = {
+  projects: [],
+  active:   null,       // selected project object
+  mode:     null,       // 'learning' | 'review'
+  side:     'english',  // review: which side shows first
+  order:    'ordered',  // review: 'ordered' | 'random'
+  deck:     [],         // cards in play
+  index:    0,
+  flipped:  false,
+};
+
+// ── Persistence ────────────────────────────────────────────────────────────────
+const STORE_KEY = 'fc_projects_v1';
+
+function loadProjects() {
+  try { state.projects = JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch { state.projects = []; }
+}
+
+function saveProjects() {
+  localStorage.setItem(STORE_KEY, JSON.stringify(state.projects));
+}
+
+// ── Routing ────────────────────────────────────────────────────────────────────
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id === 'view-home') renderHome();
+}
+
+// ── Home ───────────────────────────────────────────────────────────────────────
+function renderHome() {
+  const list  = document.getElementById('project-list');
+  const empty = document.getElementById('no-projects-msg');
+
+  if (!state.projects.length) {
+    list.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+
+  empty.hidden = true;
+  list.innerHTML = state.projects.map((p, i) => `
+    <li>
+      <div class="project-info" onclick="openProject(${i})">
+        <strong>${esc(p.name)}</strong>
+        <div class="project-meta">${p.cards.length} cards &middot; ${p.date}</div>
+      </div>
+      <button class="icon-btn" onclick="deleteProject(event, ${i})" title="Delete">🗑</button>
+    </li>
+  `).join('');
+}
+
+function openProject(i) {
+  state.active = state.projects[i];
+  document.getElementById('mode-title').textContent    = state.active.name;
+  document.getElementById('mode-subtitle').textContent = `${state.active.cards.length} cards`;
+  // Sync toggle UI to current state
+  setSide(state.side);
+  setOrder(state.order);
+  showView('view-mode');
+}
+
+function deleteProject(e, i) {
+  e.stopPropagation();
+  if (!confirm(`Delete "${state.projects[i].name}"?`)) return;
+  state.projects.splice(i, 1);
+  saveProjects();
+  renderHome();
+}
+
+// ── Import ─────────────────────────────────────────────────────────────────────
+document.getElementById('file-input').addEventListener('change', function () {
+  const file = this.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => importCSV(file, e.target.result);
+  reader.readAsText(file);
+  this.value = '';
+});
+
+function importCSV(file, text) {
+  const cards = parseCSV(text);
+  if (!cards.length) {
+    alert('No cards found — check your CSV format.');
+    return;
+  }
+
+  const project = {
+    name:     file.name.replace(/\.csv$/i, ''),
+    filename: file.name,
+    cards,
+    date:     new Date().toLocaleDateString(),
+  };
+
+  const existing = state.projects.findIndex(p => p.filename === file.name);
+  if (existing >= 0) state.projects[existing] = project;
+  else               state.projects.push(project);
+
+  saveProjects();
+  showView('view-home');
+}
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return [];
+  return lines.slice(1)
+    .map(line => {
+      const [english = '', japanese = '', pronunciation = ''] = splitCSVLine(line);
+      return {
+        english:       english.trim(),
+        japanese:      japanese.trim(),
+        pronunciation: pronunciation.trim(),
+      };
+    })
+    .filter(c => c.english || c.japanese);
+}
+
+function splitCSVLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === ',' && !inQ) {
+      cols.push(cur); cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  cols.push(cur);
+  return cols;
+}
+
+// Drag and drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (!file?.name.endsWith('.csv')) { alert('Please drop a CSV file.'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev) => importCSV(file, ev.target.result);
+  reader.readAsText(file);
+});
+
+// ── Mode selection ─────────────────────────────────────────────────────────────
+function setSide(side) {
+  state.side = side;
+  document.getElementById('btn-en').className = side === 'english'  ? '' : 'outline';
+  document.getElementById('btn-jp').className = side === 'japanese' ? '' : 'outline';
+}
+
+function setOrder(order) {
+  state.order = order;
+  document.getElementById('btn-ordered').className = order === 'ordered' ? '' : 'outline';
+  document.getElementById('btn-random').className  = order === 'random'  ? '' : 'outline';
+}
+
+function startSession(mode) {
+  state.mode    = mode;
+  state.flipped = false;
+  state.index   = 0;
+
+  let cards = [...state.active.cards];
+  if (mode === 'review' && state.order === 'random') shuffle(cards);
+  state.deck = cards;
+
+  document.getElementById('learning-wrap').hidden = mode !== 'learning';
+  document.getElementById('review-wrap').hidden   = mode !== 'review';
+
+  if (mode === 'learning') {
+    document.getElementById('card-badge').textContent = 'Learning';
+  } else {
+    const sl = state.side  === 'english'  ? 'EN→JP' : 'JP→EN';
+    const ol = state.order === 'ordered'  ? 'in order' : 'random';
+    document.getElementById('card-badge').textContent = `Review · ${sl} · ${ol}`;
+  }
+
+  showView('view-cards');
+  renderCard();
+}
+
+// ── Card rendering ─────────────────────────────────────────────────────────────
+function renderCard() {
+  const card = state.deck[state.index];
+  document.getElementById('card-progress').textContent = `${state.index + 1} / ${state.deck.length}`;
+
+  if (state.mode === 'learning') {
+    document.getElementById('lrn-en').textContent     = card.english;
+    document.getElementById('lrn-jp').textContent     = card.japanese;
+    document.getElementById('lrn-romaji').textContent = card.pronunciation;
+  } else {
+    // Reset flip
+    state.flipped = false;
+    document.getElementById('review-inner').classList.remove('flipped');
+    document.getElementById('card-hint').textContent = 'Tap to reveal';
+
+    const front = document.getElementById('review-front');
+    const back  = document.getElementById('review-back');
+    if (state.side === 'english') {
+      front.innerHTML = buildEnglish(card);
+      back.innerHTML  = buildJapanese(card);
+    } else {
+      front.innerHTML = buildJapanese(card);
+      back.innerHTML  = buildEnglish(card);
+    }
+  }
+}
+
+function buildEnglish(card) {
+  return `<div class="text-en">${esc(card.english)}</div>`;
+}
+
+function buildJapanese(card) {
+  let html = `<div class="text-jp">${esc(card.japanese)}</div>`;
+  if (card.pronunciation) {
+    html += `<div class="text-romaji">${esc(card.pronunciation)}</div>`;
+  }
+  return html;
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────────
+function navigate(dir) {
+  const next = state.index + dir;
+  if (next < 0 || next >= state.deck.length) return;
+  state.index = next;
+  renderCard();
+}
+
+// ── Flip ───────────────────────────────────────────────────────────────────────
+function flipCard() {
+  if (state.mode !== 'review') return;
+  state.flipped = !state.flipped;
+  document.getElementById('review-inner').classList.toggle('flipped', state.flipped);
+  document.getElementById('card-hint').textContent = state.flipped ? '' : 'Tap to reveal';
+}
+
+// ── Touch / swipe ──────────────────────────────────────────────────────────────
+let tx0 = 0, ty0 = 0, tt0 = 0, touchOnButton = false;
+
+function onTouchStart(e) {
+  touchOnButton = !!e.target.closest('button, a');
+  tx0 = e.touches[0].clientX;
+  ty0 = e.touches[0].clientY;
+  tt0 = Date.now();
+}
+
+function onTouchEnd(e) {
+  if (touchOnButton) return;
+
+  // If the user long-pressed to select text, don't interfere
+  if (window.getSelection().toString().length > 0) return;
+
+  const dx  = e.changedTouches[0].clientX - tx0;
+  const dy  = e.changedTouches[0].clientY - ty0;
+  const dt  = Date.now() - tt0;
+  const adx = Math.abs(dx);
+  const ady = Math.abs(dy);
+
+  if (adx < 12 && ady < 12 && dt < 300) {
+    // Tap — flip card (review mode only; flipCard() guards mode)
+    flipCard();
+    return;
+  }
+
+  if (adx > 50 && adx > ady * 1.5) {
+    // Horizontal swipe — clear any selection then navigate
+    window.getSelection().removeAllRanges();
+    navigate(dx < 0 ? 1 : -1);
+  }
+}
+
+// Attach once to both card containers
+['learning-card', 'review-scene'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', onTouchStart, { passive: true });
+  el.addEventListener('touchend',   onTouchEnd,   { passive: true });
+});
+
+// ── Utils ──────────────────────────────────────────────────────────────────────
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// ── Boot ───────────────────────────────────────────────────────────────────────
+loadProjects();
+renderHome();
+</script>
+</body>
+</html>
