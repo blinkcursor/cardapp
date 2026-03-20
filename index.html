@@ -209,6 +209,12 @@
       color: var(--pico-muted-color);
     }
 
+    .speak-btn {
+      margin-top: 0.6rem;
+      padding: 0.35rem 1rem;
+      font-size: 0.95rem;
+    }
+
     /* ── Nav buttons ── */
     .card-nav {
       display: grid;
@@ -352,6 +358,7 @@
         <div class="card-half jp-half">
           <div class="text-jp" id="lrn-jp"></div>
           <div class="text-romaji" id="lrn-romaji"></div>
+          <button class="speak-btn outline" id="lrn-speak" onclick="speakBtn(event)">🔊</button>
         </div>
       </div>
     </div>
@@ -572,9 +579,11 @@ function renderCard() {
   document.getElementById('card-progress').textContent = `${state.index + 1} / ${state.deck.length}`;
 
   if (state.mode === 'learning') {
-    document.getElementById('lrn-en').textContent     = card.english;
-    document.getElementById('lrn-jp').textContent     = card.japanese;
-    document.getElementById('lrn-romaji').textContent = card.pronunciation;
+    document.getElementById('lrn-en').textContent        = card.english;
+    document.getElementById('lrn-jp').textContent        = card.japanese;
+    document.getElementById('lrn-romaji').textContent    = card.pronunciation;
+    document.getElementById('lrn-speak').dataset.text    = card.japanese;
+    document.getElementById('lrn-speak').hidden          = !speechSupported;
   } else {
     // Reset flip
     state.flipped = false;
@@ -602,6 +611,10 @@ function buildJapanese(card) {
   if (card.pronunciation) {
     html += `<div class="text-romaji">${esc(card.pronunciation)}</div>`;
   }
+  if (speechSupported) {
+    html += `<button class="speak-btn outline" data-text="${esc(card.japanese)}"
+                     onclick="speakBtn(event)">🔊</button>`;
+  }
   return html;
 }
 
@@ -619,6 +632,23 @@ function flipCard() {
   state.flipped = !state.flipped;
   document.getElementById('review-inner').classList.toggle('flipped', state.flipped);
   document.getElementById('card-hint').textContent = state.flipped ? '' : 'Tap to reveal';
+}
+
+// ── Speech ─────────────────────────────────────────────────────────────────────
+const speechSupported = 'speechSynthesis' in window;
+
+function speakBtn(e) {
+  e.stopPropagation();
+  speak(e.currentTarget.dataset.text);
+}
+
+function speak(text) {
+  if (!speechSupported || !text) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'ja-JP';
+  u.rate = 0.9;
+  speechSynthesis.speak(u);
 }
 
 // ── Touch / swipe ──────────────────────────────────────────────────────────────
@@ -679,8 +709,50 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 
+// ── Default card set ───────────────────────────────────────────────────────────
+const DEFAULT_CSV = `English,Japanese,Pronunciation
+Hello / Good afternoon,こんにちは,kon-nee-chee-wa
+Good morning,おはようございます,oh-ha-yo go-zai-mas
+Good evening,こんばんは,kon-ban-wa
+Thank you,ありがとう,ah-ree-gah-toh
+Thank you (polite),ありがとうございます,ah-ree-gah-toh go-zai-mas
+Thanks,どうも,do-mo
+Excuse me / Sorry,すみません,soo-mee-mah-sen
+Please,お願いします,oh-neh-gai-shee-mas
+Please (command),ください,kudasai
+Yes,はい,hi
+No,いいえ,ee-eh
+Do you speak English?,英語を話せますか？,eh-go oh ha-nah-seh-mas ka
+I don't understand,わかりません,wah-kah-ree-mah-sen
+This one please,これお願いします,ko-reh oh-neh-gai-shee-mas
+How much is this?,いくらですか？,ee-koo-rah dess ka
+Where is the toilet?,トイレはどこですか？,toy-reh wa doh-ko dess ka
+One please,一つお願いします,hee-toh-tsu oh-neh-gai-shee-mas
+Two please,二つお願いします,foo-tah-tsu oh-neh-gai-shee-mas
+Three please,三つお願いします,mit-tsu oh-ne-gai-shee-mas
+Four please,四つお願いします,yot-tsu oh-neh-gai-shee-mas
+How much?,いくらですか,ikura desu ka
+How many?,いくつですか,ikutsu desu ka
+Check please (restaurant),お会計お願いします,oh-kai-keh oh-neh-gai-shee-mas
+It's OK / no problem,大丈夫です,dye-joe-boo dess
+Delicious,おいしい,oh-ee-shee
+Thank you for the meal,ごちそうさまでした,go-chee-soh-sah-mah de-shi-ta`;
+
+function seedDefaultIfEmpty() {
+  if (state.projects.length > 0) return;
+  const project = {
+    name:     'Japanese Basics',
+    filename: 'japanese-basics.csv',
+    cards:    parseCSV(DEFAULT_CSV),
+    date:     new Date().toLocaleDateString(),
+  };
+  state.projects.push(project);
+  saveProjects();
+}
+
 // ── Boot ───────────────────────────────────────────────────────────────────────
 loadProjects();
+seedDefaultIfEmpty();
 renderHome();
 </script>
 </body>
